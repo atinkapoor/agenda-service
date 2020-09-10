@@ -1,0 +1,42 @@
+{
+  "parser": "babel-eslint",
+  "extends": [
+    "eslint:recommended",
+    "eslint-config-airbnb-base",
+    "eslint-config-airbnb-base/rules/strict",
+    "eslint-config-airbnb-base/rules/errors",
+    "eslint-config-airbnb-base/rules/node",
+    "eslint-config-airbnb-base/rules/style",
+    "eslint-config-airbnb-base/rules/variables",
+    "eslint-config-airbnb-base/rules/es6",
+    "eslint-config-airbnb-base/rules/imports",
+    "plugin:prettier/recommended"
+  ],
+  "env": {
+    "es6": true,
+    "node": true,
+    "jest/globals": true
+  },
+  "plugins": ["prettier", "jest"],
+  "parserOptions": {},
+  "rules": {
+    "comma-dangle": 0,
+    "arrow-body-style": 0,
+    "global-require": 0,
+    "quotes": [2, "single"],
+    "import/no-extraneous-dependencies": 0,
+    "no-param-reassign": 0,
+    "prettier/prettier": ["error", { "endOfLine": "auto" }],
+    "linebreak-style": ["error", "unix"]
+  },
+  "globals": {
+    "fetch": true
+  },
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js"]
+      }
+    }
+  }
+}

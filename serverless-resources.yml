@@ -1,0 +1,43 @@
+Resources:
+  WebinarFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${env:WEBINAR_FILES_BUCKET_NAME}
+      AccessControl: Private
+  UserPhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${env:USER_PHOTOS_BUCKET_NAME}
+      AccessControl: Private
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['PUT', 'GET']
+            AllowedOrigins: ['*']
+  QuestionAnswerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${env:QUESTION_ANSWER_TABLE_NAME}
+      AttributeDefinitions:
+        - AttributeName: questionId
+          AttributeType: S
+        - AttributeName: presentationId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: questionId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST    
+      GlobalSecondaryIndexes: 
+        - IndexName: "presentationId-status-Index"
+          KeySchema: 
+            - AttributeName: presentationId
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection: 
+            ProjectionType: "ALL"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  

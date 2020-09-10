@@ -1,0 +1,182 @@
+service: agenda-api
+
+plugins:
+  - serverless-prune-plugin
+  - serverless-api-stage
+  - serverless-dotenv-plugin
+  - serverless-iam-roles-per-function
+  - serverless-sentry
+  - serverless-api-gateway-caching
+
+custom:
+  stageSettings:
+    MethodSettings:
+      ThrottlingRateLimit: 1000
+      ThrottlingBurstLimit: 500
+  prune:
+    automatic: true
+    number: 25
+  optimize:
+    debug: true
+    minify: false
+  stage: ${opt:stage, self:provider.stage}
+  region: ${opt:region, self:provider.region}
+  apiAuthorizer:
+    arn: arn:aws:cognito-idp:${env:AWS_REGION_NAME}:${env:AWS_ACCOUNT_ID}:userpool/${env:COGNITO_USER_POOL_ID}
+  corsConfig: true
+  sentry:
+    dsn: ${env:SENTRY_DSN}
+    environment: ${env:SENTRY_ENVIRONMENT}
+  apiGatewayCaching:
+    enabled: true
+    ttlInSeconds: 10
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  timeout: 20
+  stage: ${env:STAGE}
+  region: ${env:AWS_REGION_NAME}
+  vpc:
+    securityGroupIds:
+      - ${env:VPC_SECURITY_GROUP_ID}
+    subnetIds:
+      - ${env:VPC_SUBNET_ID_1}
+      - ${env:VPC_SUBNET_ID_2}
+      - ${env:VPC_SUBNET_ID_3}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - cloudwatch:PutMetricData
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: '*'
+
+functions:
+  users-process:
+    handler: src/sls-users-process/user.handler
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - cognito-idp:ListUsers
+          - cognito-idp:ListGroups
+          - cognito-idp:ListUsersInGroup
+        Resource: arn:aws:cognito-idp:${env:AWS_REGION_NAME}:${env:AWS_ACCOUNT_ID}:userpool/${env:COGNITO_USER_POOL_ID}
+    events:
+      - http:
+          path: users/{type}
+          method: get
+          cors: ${self:custom.corsConfig}
+          integration: lambda
+          authorizer: ${self:custom.apiAuthorizer}
+  groups-process:
+    handler: src/sls-users-process/group.handler
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - cognito-idp:AdminAddUserToGroup
+        Resource: arn:aws:cognito-idp:${env:AWS_REGION_NAME}:${env:AWS_ACCOUNT_ID}:userpool/${env:COGNITO_USER_POOL_ID}
+    events:
+      - http:
+          path: assigngroup
+          method: get
+          cors: ${self:custom.corsConfig}
+          integration: lambda
+          authorizer: ${self:custom.apiAuthorizer}
+  image-upload-initiate-process:
+    handler: src/sls-users-process/imageUploadInitiate.handler
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - s3:PutObject
+          - s3:PutObjectAcl
+        Resource:
+          - arn:aws:s3:::${env:USER_PHOTOS_BUCKET_NAME}
+          - arn:aws:s3:::${env:USER_PHOTOS_BUCKET_NAME}/*
+    events:
+      - http:
+          path: photo/upload
+          method: post
+          cors: ${self:custom.corsConfig}
+          integration: lambda
+          authorizer: ${self:custom.apiAuthorizer}
+  image-upload-handler-process:
+    handler: src/sls-users-process/imageUploadHandler.handler
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+        Resource:
+          - arn:aws:s3:::${env:USER_PHOTOS_BUCKET_NAME}
+          - arn:aws:s3:::${env:USER_PHOTOS_BUCKET_NAME}/*
+      - Effect: Allow
+        Action:
+          - cognito-idp:AdminUpdateUserAttributes
+        Resource: arn:aws:cognito-idp:${env:AWS_REGION_NAME}:${env:AWS_ACCOUNT_ID}:userpool/${env:COGNITO_USER_POOL_ID}
+  question-answer-process:
+    handler: src/sls-question-answer-process/question.handler
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - cognito-idp:ListUsers
+          - cognito-idp:AdminListGroupsForUser
+          - cognito-idp:ListUsersInGroup
+        Resource: arn:aws:cognito-idp:${env:AWS_REGION_NAME}:${env:AWS_ACCOUNT_ID}:userpool/${env:COGNITO_USER_POOL_ID}
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:Scan
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource:
+          - 'Fn::GetAtt':
+              - QuestionAnswerTable
+              - Arn
+          - 'Fn::GetAtt':
+              - PresentationTable
+              - Arn
+          - 'Fn::GetAtt':
+              - PresenterPresentationTable
+              - Arn
+          - 'Fn::Join':
+              [
+                '/',
+                [
+                  { 'Fn::GetAtt': [QuestionAnswerTable, 'Arn'] },
+                  'index',
+                  'presentationId-status-Index',
+                ],
+              ]
+    events:
+      - http:
+          path: qa/{type}
+          method: get
+          request:
+            parameters:
+              paths:
+                type: false
+          cors: ${self:custom.corsConfig}
+          integration: lambda
+          authorizer: ${self:custom.apiAuthorizer}
+      - http:
+          path: qa
+          method: post
+          request:
+            parameters:
+              message:
+                type: true
+              questionID:
+                type: false
+          cors: ${self:custom.corsConfig}
+          integration: lambda
+          authorizer: ${self:custom.apiAuthorizer}
+
+resources: ${file(serverless-resources.yml)}

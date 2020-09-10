@@ -1,0 +1,19 @@
+config:
+  target: "https://api.dev.agenda.com/dev/presentation/all"
+  phases:
+    - name: "Load Test Presentation endpoint"
+      duration: 60
+      arrivalRate: 1
+      rampTo: 100
+  defaults:
+    headers:
+      Accept: 'application/json'
+      Content-Type: 'application/json'
+  ensure:
+    maxErrorRate: 1
+scenarios:
+  - flow:
+    - get:
+        url: "https://api.dev.agenda.com/dev/presentation/all"
+        headers:
+          Authorization: "Bearer XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
